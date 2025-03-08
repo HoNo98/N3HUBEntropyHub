@@ -10,7 +10,7 @@ import math
 import itertools
 from pynwb import NWBHDF5IO
 from dandi.download import download
-import entropyhub as eh  
+import EntropyHub as eh  
 
 ###############################################################################
 # SURROGATE FUNCTIONS
