@@ -26,7 +26,7 @@ please refer to the package documentation.
 """
 
 __version__ = "0.1.0"
-__author__ = "Hossein Nowrouzi-Nezhad <hnowrozinezhad@mail.com>"
+__author__ = "Hossein Nowrouzi-Nezhad <hnowrozinezhad@gmail.com>"
 
 from .core import original, global_shuffle, circular_shift, local_jitter, phase_random, pres_spike_sum, isi_based
 
