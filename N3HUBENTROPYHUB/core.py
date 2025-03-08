@@ -10,7 +10,7 @@ import math
 import itertools
 from pynwb import NWBHDF5IO
 from dandi.download import download
-import EntropyHub as eh  
+import EntropyHub as eh  # Ensure you have the latest version: pip install --upgrade entropyhub
 
 ###############################################################################
 # SURROGATE FUNCTIONS
@@ -64,6 +64,7 @@ def shuffle_pres_spike_sum(data):
 # NWB DATA HANDLING FUNCTIONS
 ###############################################################################
 def get_spike_data(nwbfile, max_samples=1_000_000):
+    # Try to extract spike times from nwbfile.units
     if nwbfile.units is not None and len(nwbfile.units) > 0:
         if 'spike_times' in nwbfile.units.colnames:
             spike_times_col = nwbfile.units['spike_times']
@@ -71,7 +72,7 @@ def get_spike_data(nwbfile, max_samples=1_000_000):
                 spike_times_array = np.array(spike_times_col[0])
                 if len(spike_times_array) > 1:
                     return spike_times_array
-    
+    # Fallback: use df/f imaging data to generate spike times
     if "ophys" in nwbfile.processing:
         ophys_mod = nwbfile.processing["ophys"]
         for iface_name, iface in ophys_mod.data_interfaces.items():
@@ -117,45 +118,45 @@ def _load_binned_data(path, bin_size=0.01):
     return spike_times, binned
 
 ###############################################################################
-# ENTROPY FUNCTIONS DICTIONARY (Mapping names to EntropyHub functions)
+# UPDATED ENTROPY FUNCTIONS DICTIONARY (Based on EntropyHub Guide)
 ###############################################################################
 entropy_functions = {
-    "permutation_entropy": eh.permutation_entropy,
-    "approximate_entropy": eh.approximate_entropy,
-    "sample_entropy": eh.sample_entropy,
-    "fuzzy_entropy": eh.fuzzy_entropy,
-    "spectral_entropy": eh.spectral_entropy,
-    "dispersion_entropy": eh.dispersion_entropy,
-    "renyi_entropy": eh.renyi_entropy,
-    "svd_entropy": eh.svd_entropy,
-    "distribution_entropy": eh.distribution_entropy,
-    "multiscale_entropy": eh.multiscale_entropy,
-    "composite_multiscale_entropy": eh.composite_multiscale_entropy,
-    "refined_composite_multiscale_entropy": eh.refined_composite_multiscale_entropy,
-    "symbolic_entropy": eh.symbolic_entropy,
-    "permutation_lempel_ziv_complexity": eh.permutation_lempel_ziv_complexity,
-    "conditional_entropy": eh.conditional_entropy,
-    "cross_entropy": eh.cross_entropy,
-    "shannon_entropy": eh.shannon_entropy,
-    "energy_entropy": eh.energy_entropy,
-    "differential_entropy": eh.differential_entropy,
-    "wavelet_entropy": eh.wavelet_entropy
+    "approximate_entropy": eh.approx_entropy,                     # ApEn
+    "sample_entropy": eh.sample_entropy,                           # SampEn
+    "fuzzy_entropy": eh.fuzzy_entropy,                             # FuzzEn
+    "kolmogorov_entropy": eh.k2_entropy,                           # K2En
+    "permutation_entropy": eh.perm_entropy,                        # PermEn
+    "conditional_entropy": eh.cond_entropy,                        # CondEn (corrected Conditional Entropy)
+    "distribution_entropy": eh.distribution_entropy,               # DistEn
+    "spectral_entropy": eh.spectral_entropy,                       # SpecEn
+    "dispersion_entropy": eh.dispersion_entropy,                   # DispEn
+    "symbolic_dynamic_entropy": eh.symbolic_dynamic_entropy,         # SyDyEn
+    "increment_entropy": eh.increment_entropy,                     # IncrEn
+    "cosine_similarity_entropy": eh.cosine_similarity_entropy,     # CoSiEn
+    "phase_entropy": eh.phase_entropy,                             # PhasEn
+    "slope_entropy": eh.slope_entropy,                             # SlopEn
+    "bubble_entropy": eh.bubble_entropy,                           # BubbEn
+    "gridded_distribution_entropy": eh.gridded_distribution_entropy, # GridEn
+    "entropy_of_entropy": eh.entropy_of_entropy,                   # EnofEn
+    "attention_entropy": eh.attention_entropy,                     # AttnEn
+    "diversity_entropy": eh.diversity_entropy,                     # DivEn
+    "range_entropy": eh.range_entropy                              # RangEn
 }
 
 ###############################################################################
 # BASE CLASS FOR SURROGATE METHODS
 ###############################################################################
 class SurrogateBase:
-    surrogate_function = None  
+    surrogate_function = None  # To be defined by subclass
 
     @classmethod
     def _compute_entropy(cls, path, entropy_name, bin_size=0.01, **kwargs):
-    
+        # Load binned spike data from the NWB file
         _, data = _load_binned_data(path, bin_size)
-  
+        # Apply surrogate transformation if defined
         if cls.surrogate_function is not None:
             data = cls.surrogate_function(data)
-          
+        # Compute and return the desired entropy measure using EntropyHub
         return entropy_functions[entropy_name](data, **kwargs)
 
 ###############################################################################
@@ -179,6 +180,7 @@ class PhaseRandom(SurrogateBase):
 class PresSpikeSum(SurrogateBase):
     surrogate_function = staticmethod(shuffle_pres_spike_sum)
 
+# Special handling for ISI-based surrogate (operates on raw spike times before binning)
 class ISIBased:
     @classmethod
     def _compute_entropy(cls, path, entropy_name, bin_size=0.01, **kwargs):
@@ -190,7 +192,7 @@ class ISIBased:
         return entropy_functions[entropy_name](data, **kwargs)
 
 ###############################################################################
-# ADD ENTROPY METHODS TO EACH CLASS
+# DYNAMICALLY ADD ENTROPY METHODS TO EACH CLASS
 ###############################################################################
 def make_entropy_method(ent_name):
     @classmethod
@@ -198,6 +200,7 @@ def make_entropy_method(ent_name):
         return cls._compute_entropy(path, ent_name, bin_size, **kwargs)
     return method
 
+# Add each entropy method to all surrogate classes
 for name in entropy_functions.keys():
     setattr(Original, name, make_entropy_method(name))
     setattr(GlobalShuffle, name, make_entropy_method(name))
