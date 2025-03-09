@@ -1,16 +1,10 @@
-# -*- coding: utf-8 -*-
-"""
-Created on Sat Mar  8 16:51:06 2025
-
-@author: Hossein Nowrouzi-Nezhad
-"""
 import numpy as np
 import matplotlib.pyplot as plt
 import math
 import itertools
 from pynwb import NWBHDF5IO
 from dandi.download import download
-import EntropyHub as eh  # Ensure you have the latest version: pip install --upgrade entropyhub
+import EntropyHub as eh  
 
 ###############################################################################
 # SURROGATE FUNCTIONS
@@ -64,7 +58,6 @@ def shuffle_pres_spike_sum(data):
 # NWB DATA HANDLING FUNCTIONS
 ###############################################################################
 def get_spike_data(nwbfile, max_samples=1_000_000):
-    # Try to extract spike times from nwbfile.units
     if nwbfile.units is not None and len(nwbfile.units) > 0:
         if 'spike_times' in nwbfile.units.colnames:
             spike_times_col = nwbfile.units['spike_times']
@@ -72,7 +65,6 @@ def get_spike_data(nwbfile, max_samples=1_000_000):
                 spike_times_array = np.array(spike_times_col[0])
                 if len(spike_times_array) > 1:
                     return spike_times_array
-    # Fallback: use df/f imaging data to generate spike times
     if "ophys" in nwbfile.processing:
         ophys_mod = nwbfile.processing["ophys"]
         for iface_name, iface in ophys_mod.data_interfaces.items():
@@ -121,42 +113,39 @@ def _load_binned_data(path, bin_size=0.01):
 # UPDATED ENTROPY FUNCTIONS DICTIONARY (Based on EntropyHub Guide)
 ###############################################################################
 entropy_functions = {
-    "approximate_entropy": eh.approx_entropy,                     # ApEn
-    "sample_entropy": eh.sample_entropy,                           # SampEn
-    "fuzzy_entropy": eh.fuzzy_entropy,                             # FuzzEn
-    "kolmogorov_entropy": eh.k2_entropy,                           # K2En
-    "permutation_entropy": eh.perm_entropy,                        # PermEn
-    "conditional_entropy": eh.cond_entropy,                        # CondEn (corrected Conditional Entropy)
-    "distribution_entropy": eh.distribution_entropy,               # DistEn
-    "spectral_entropy": eh.spectral_entropy,                       # SpecEn
-    "dispersion_entropy": eh.dispersion_entropy,                   # DispEn
-    "symbolic_dynamic_entropy": eh.symbolic_dynamic_entropy,         # SyDyEn
-    "increment_entropy": eh.increment_entropy,                     # IncrEn
-    "cosine_similarity_entropy": eh.cosine_similarity_entropy,     # CoSiEn
-    "phase_entropy": eh.phase_entropy,                             # PhasEn
-    "slope_entropy": eh.slope_entropy,                             # SlopEn
-    "bubble_entropy": eh.bubble_entropy,                           # BubbEn
-    "gridded_distribution_entropy": eh.gridded_distribution_entropy, # GridEn
-    "entropy_of_entropy": eh.entropy_of_entropy,                   # EnofEn
-    "attention_entropy": eh.attention_entropy,                     # AttnEn
-    "diversity_entropy": eh.diversity_entropy,                     # DivEn
-    "range_entropy": eh.range_entropy                              # RangEn
+    "approximate_entropy": eh.ApEn,                   # ApEn: Approximate Entropy
+    "sample_entropy": eh.SampEn,                      # SampEn: Sample Entropy
+    "fuzzy_entropy": eh.FuzzEn,                       # FuzzEn: Fuzzy Entropy
+    "kolmogorov_entropy": eh.K2En,                    # K2En: Kolmogorov Entropy
+    "permutation_entropy": eh.PermEn,                 # PermEn: Permutation Entropy
+    "conditional_entropy": eh.CondEn,                 # CondEn: Corrected Conditional Entropy
+    "distribution_entropy": eh.DistEn,                # DistEn: Distribution Entropy
+    "spectral_entropy": eh.SpecEn,                    # SpecEn: Spectral Entropy
+    "dispersion_entropy": eh.DispEn,                  # DispEn: Dispersion Entropy
+    "symbolic_dynamic_entropy": eh.SyDyEn,            # SyDyEn: Symbolic Dynamic Entropy
+    "increment_entropy": eh.IncrEn,                   # IncrEn: Increment Entropy
+    "cosine_similarity_entropy": eh.CoSiEn,           # CoSiEn: Cosine Similarity Entropy
+    "phase_entropy": eh.PhasEn,                       # PhasEn: Phase Entropy
+    "slope_entropy": eh.SlopEn,                       # SlopEn: Slope Entropy
+    "bubble_entropy": eh.BubbEn,                      # BubbEn: Bubble Entropy
+    "gridded_distribution_entropy": eh.GridEn,        # GridEn: Gridded Distribution Entropy
+    "entropy_of_entropy": eh.EnofEn,                  # EnofEn: Entropy of Entropy
+    "attention_entropy": eh.AttnEn,                   # AttnEn: Attention Entropy
+    "diversity_entropy": eh.DivEn,                    # DivEn: Diversity Entropy
+    "range_entropy": eh.RangEn                        # RangEn: Range Entropy
 }
 
 ###############################################################################
 # BASE CLASS FOR SURROGATE METHODS
 ###############################################################################
 class SurrogateBase:
-    surrogate_function = None  # To be defined by subclass
+    surrogate_function = None  
 
     @classmethod
     def _compute_entropy(cls, path, entropy_name, bin_size=0.01, **kwargs):
-        # Load binned spike data from the NWB file
         _, data = _load_binned_data(path, bin_size)
-        # Apply surrogate transformation if defined
         if cls.surrogate_function is not None:
             data = cls.surrogate_function(data)
-        # Compute and return the desired entropy measure using EntropyHub
         return entropy_functions[entropy_name](data, **kwargs)
 
 ###############################################################################
@@ -180,7 +169,6 @@ class PhaseRandom(SurrogateBase):
 class PresSpikeSum(SurrogateBase):
     surrogate_function = staticmethod(shuffle_pres_spike_sum)
 
-# Special handling for ISI-based surrogate (operates on raw spike times before binning)
 class ISIBased:
     @classmethod
     def _compute_entropy(cls, path, entropy_name, bin_size=0.01, **kwargs):
@@ -200,7 +188,6 @@ def make_entropy_method(ent_name):
         return cls._compute_entropy(path, ent_name, bin_size, **kwargs)
     return method
 
-# Add each entropy method to all surrogate classes
 for name in entropy_functions.keys():
     setattr(Original, name, make_entropy_method(name))
     setattr(GlobalShuffle, name, make_entropy_method(name))
